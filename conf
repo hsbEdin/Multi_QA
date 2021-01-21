@@ -1,0 +1,71 @@
+CoQA_TRAIN_FILE	data/coqa-train-v1.0.json
+CoQA_DEV_FILE	data/coqa-dev-v1.0.json
+Quac_TRAIN_FILE data/quac_original/train_v0.2.json
+Quac_DEV_FILE data/quac_original/val_v0.2.json
+
+INIT_WORD_EMBEDDING_FILE	../glove/glove.840B.300d.txt
+
+; TRAIN_FILE	data/train/trainset.json
+; DEV_FILE	data/dev/devset.json
+; TRAIN_FILE	data/train/cn_trainset.json
+; DEV_FILE	data/dev/cn_devset.json
+TRAIN_FILE	data/train/all_trainset.json
+DEV_FILE	data/dev/all_devset.json
+OUTPUT_FILE output/
+WORD_EMBEDDING_FILE		mnt/sgns.target.word-word.dynwin5.thr10.neg5.dim300.iter5
+
+DROPOUT	0.3
+my_dropout_p	0.3
+VARIATIONAL_DROPOUT
+
+BERT
+# BERT_LARGE
+
+LOCK_BERT
+BERT_LINEAR_COMBINE
+#BERT_tokenizer_file bert-base-uncased/bert-base-uncased-vocab.txt
+BERT_tokenizer_file bert-base-chinese/vocab.txt
+
+coqa_BERT_tokenizer_file bert-base-uncased/bert-base-uncased-vocab.txt
+coqa_BERT_model_file bert-base-uncased/
+#BERT_model_file bert-base-uncased/
+BERT_model_file bert-base-chinese/
+#BERT_large_tokenizer_file   bert-large-uncased/bert-large-uncased-vocab.txt
+#BERT_large_model_file   bert-large-uncased/
+
+SEED	1033
+SPACY_FEATURE
+CONTEXT_RNN_HIDDEN_DIM	300
+
+MAX_WORD_PER_SENTENCE	30
+
+
+
+grad_clipping	 10
+do_seq_dropout
+
+embedding_dim	300
+attention_hidden	300
+
+
+max_featrue_length	384
+doc_stride	128
+ques_max_len	30
+ans_max_len    30
+chinese_pre_trained_dir    /data/shibo/qa/multi_qa/bert-base-chinese
+english_pre_trained_dir    /data/shibo/qa/multi_qa/bert-base-uncased
+
+hidden_size    768
+N_BEST    5
+BATCH_SIZE    16
+EPOCH	50
+RESULT_FILE    output/
+prealign_hidden    768
+VOCAB_DIM    768
+dropout_emb    0.4
+max_turn_nums    4
+loss_ratio    0.5
+### seq2seq
+dropout_p    0.5
+#答案生成的最大 长度
+max_answer_length    15
