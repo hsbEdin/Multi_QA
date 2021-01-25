@@ -50,13 +50,13 @@ class ConvQA_CN_Net(nn.Module):
 
         self.embedding = nn.Embedding(self.opt['train_words'], self.hidden_size)
         self.dropout = nn.Dropout(self.dropout_p)
-        # vocab_dim = int(opt['VOCAB_DIM'])
-        # self.pre_align = Attention(vocab_dim, opt['prealign_hidden'], correlation_func = 5, do_similarity = True)
+        vocab_dim = int(opt['VOCAB_DIM'])
+        self.pre_align = Attention(vocab_dim, opt['prealign_hidden'], correlation_func = 5, do_similarity = True)
 
         self.criterion = nn.NLLLoss()
 
         self.num_layers = 2
-        self.brnn = nn.LSTM(self.hidden_size , self.hidden_size, self.num_layers, bidirectional=True)
+        self.brnn = nn.LSTM(self.hidden_size, self.hidden_size, self.num_layers, bidirectional=True)
         self.rnn = nn.LSTM(self.hidden_size, self.hidden_size, self.num_layers, bidirectional=True)
         self.Vh = nn.Parameter(torch.FloatTensor(1, self.hidden_size * 2), requires_grad = True)
         self.Wh = nn.Parameter(torch.FloatTensor(self.hidden_size * 2, self.hidden_size * 2), requires_grad = True)
@@ -108,101 +108,98 @@ class ConvQA_CN_Net(nn.Module):
             else:
                 his_sign.append(1)
 
-        ### 用his[0]==0 找出0
         history = torch.cat(new_his, 0)
+        history = self.model(history)[0]
         history_mask = torch.cat(new_his_mask, 0)
-        q_tensor = torch.cat(q, 0)
-        q_mask = torch.cat(q_mask, 0)
+        # q_tensor = torch.cat(q, 0)
+        # q_mask = torch.cat(q_mask, 0)
 
-        history_length = history.size()[1]
-        q_length = q_tensor.size()[1]
+        # history_length = history.size()[1]
+        # q_length = q_tensor.size()[1]
+        #
+        # history = self.embedding(history).view(history_length, self.batch_size, -1)
+        # q_tensor = self.embedding(q_tensor).view(q_length, self.batch_size, -1)
+        #
+        # history, _ = self.rnn(history)
+        # q_tensor, _ = self.rnn(q_tensor)
 
-        history = self.embedding(history).view(history_length, self.batch_size, -1)
-        q_tensor = self.embedding(q_tensor).view(q_length, self.batch_size, -1)
-
-        history, _ = self.rnn(history)
-        q_tensor, _ = self.rnn(q_tensor)
-
-        history = self.model(history, attention_mask=history_mask)[0]
-        q_tensor = self.model(q_tensor, attention_mask=q_mask)[0]
+        # history = self.model(history, attention_mask=history_mask)[0]
+        # q_tensor = self.model(q_tensor, attention_mask=q_mask)[0]
         # history = history.repeat([1,1,2]).cuda()
         # q_tensor = q_tensor.repeat([1, 1, 2]).cuda()
-        # x_list = torch.unbind(x_bert, 0)
-        # x_final_list = []
-        # for x, his in zip(x_list, his_info_list):
-        #     if his:
-        #         his["his"] = torch.cat(his["his"], 0)
-        #         his["his"] = self.model(his["his"])[0]
-        #         his["his_mask"] = torch.cat(his["his_mask"], 0)
-        #         his_size = his["his"].size()[0]
-        #         x_bert_ex = x.expand(his_size, -1, -1)
-        #         # print(x_bert_ex.size(), his["his"].size())
-        #         # exit(0)
-        #         x_align = self.pre_align(x_bert_ex, his["his"], his["his_mask"])
-        #         x_final = torch.mean(x_align, dim=0)
-        #         x_final = x_final.unsqueeze(0)  # 1, 384,768
-        #         x_final = x + F.relu(x_final)
-        #         x_final_list.append(x_final)
-        #     else:
-        #         x = torch.unsqueeze(x, 0)
-        #         x_final_list.append(x)
-        # x_final = torch.cat(x_final_list, 0)
-        # x_final = self.layernorm(x_final).cuda()
+        x_list = torch.unbind(x_bert, 0)
+        x_final_list = []
 
-
-        x_bert = x_bert.view(-1, self.batch_size, self.hidden_size)
-        x_bert, _ = self.brnn(x_bert)
-        history = history.view(-1, self.batch_size, self.hidden_size)
-        bi_history, _ = self.brnn(history)
-        q_tensor = q_tensor.view(-1, self.batch_size, self.hidden_size)
-        bi_q_tensor, _ = self.brnn(q_tensor)
-
-        bi_history = bi_history.view(self.batch_size, -1, self.hidden_size * 2)
-        bi_q_tensor = bi_q_tensor.view(self.batch_size, -1, self.hidden_size * 2)
-        # print("q_tensor: ", q_tensor)
-        ### Attention
-        self.Vh.data = self.Vh.squeeze(0)
-        self.Vq.data = self.Vq.squeeze(0)
-        # x_h = self.pre_align(x_bert.view(self.batch_size, -1, self.hidden_size * 2), history, history_mask)
-        xh = self.attention(x_bert, x_mask, bi_history, history_mask, self.Vq, self.Wq, self.Uq)
-        x_h = []
-        for i, s in enumerate(his_sign):
-            tmp = x_bert.view(self.batch_size, -1, self.hidden_size * 2)[i]
-            if s==0:
-                x_h.append(tmp.unsqueeze(0))
+        for i, x in enumerate(x_list):
+            if his_sign[i]:
+                his = history[i].unsqueeze(0)
+                his_mask = history_mask[i].unsqueeze(0)
+                x_bert_ex = x.unsqueeze(0)
+                x_align = self.pre_align(x_bert_ex, his, his_mask)
+                x_final = torch.mean(x_align, dim=0)
+                x_final = x_final.unsqueeze(0)  # 1, 384,768
+                x_final = x + F.relu(x_final)
+                x_final_list.append(x_final)
             else:
-                x_h.append((tmp + F.relu(xh[i])).unsqueeze(0))
-        x_h = torch.cat(x_h, 0)
-        x_h_q = self.attention(x_h.view(-1, self.batch_size, self.hidden_size * 2), x_mask, bi_q_tensor, q_mask, self.Vq, self.Wq, self.Uq)
-        x_h_q = x_bert.view(self.batch_size, -1, self.hidden_size * 2) + F.relu(x_h_q)
+                x = torch.unsqueeze(x, 0)
+                x_final_list.append(x)
+        x_final = torch.cat(x_final_list, 0)
+        x_final = self.layernorm(x_final).cuda()
 
-        x_h = self.layernorm(x_h).type(torch.FloatTensor).cuda()
-        x_h_q = self.layernorm(x_h_q).type(torch.FloatTensor).cuda()
 
-        x_h = self.dropout(x_h)
-        x_h_q = self.dropout(x_h_q)
-        # value0 = torch.mean(torch.mean(x_h, 2), 1)
-        # value1 = torch.mean(torch.mean(x_h_q, 2), 1)
+        # x_bert = x_bert.view(-1, self.batch_size, self.hidden_size)
+        # x_bert, _ = self.brnn(x_bert)
+        # history = history.view(-1, self.batch_size, self.hidden_size)
+        # bi_history, _ = self.brnn(history)
+        # q_tensor = q_tensor.view(-1, self.batch_size, self.hidden_size)
+        # bi_q_tensor, _ = self.brnn(q_tensor)
+        #
+        # bi_history = bi_history.view(self.batch_size, -1, self.hidden_size * 2)
+        # bi_q_tensor = bi_q_tensor.view(self.batch_size, -1, self.hidden_size * 2)
+        # # print("q_tensor: ", q_tensor)
+        # ### Attention
+        # self.Vh.data = self.Vh.squeeze(0)
+        # self.Vq.data = self.Vq.squeeze(0)
+        # # x_h = self.pre_align(x_bert.view(self.batch_size, -1, self.hidden_size * 2), history, history_mask)
+        # xh = self.attention(x_bert, x_mask, bi_history, history_mask, self.Vq, self.Wq, self.Uq)
+        # x_h = []
+        # for i, s in enumerate(his_sign):
+        #     tmp = x_bert.view(self.batch_size, -1, self.hidden_size * 2)[i]
+        #     if s==0:
+        #         x_h.append(tmp.unsqueeze(0))
+        #     else:
+        #         x_h.append((tmp + F.relu(xh[i])).unsqueeze(0))
+        # x_h = torch.cat(x_h, 0)
+        # x_h_q = self.attention(x_h.view(-1, self.batch_size, self.hidden_size * 2), x_mask, bi_q_tensor, q_mask, self.Vq, self.Wq, self.Uq)
+        # x_h_q = x_bert.view(self.batch_size, -1, self.hidden_size * 2) + F.relu(x_h_q)
+        #
+        # x_h = self.layernorm(x_h).type(torch.FloatTensor).cuda()
+        # x_h_q = self.layernorm(x_h_q).type(torch.FloatTensor).cuda()
+        #
+        # x_h = self.dropout(x_h)
+        # x_h_q = self.dropout(x_h_q)
+        # # value0 = torch.mean(torch.mean(x_h, 2), 1)
+        # # value1 = torch.mean(torch.mean(x_h_q, 2), 1)
         # #
         extract = []
         generate = []
         type_loss = []
-        for i, (v1, v2, t) in enumerate(zip(x_h, x_h_q, answer_types)):
-            if t == 'extractive':
-                ans = torch.tensor([1, 0]).float().cuda()
-            else:
-                ans = torch.tensor([0, 1]).float().cuda()
-
-            o1 = F.avg_pool1d(v1.unsqueeze(0), kernel_size=self.hidden_size * 2).squeeze(2)
-            o2 = F.avg_pool1d(v2.unsqueeze(0), kernel_size=self.hidden_size * 2).squeeze(2)
-            output = self.type_out(torch.cat((o1, o2), 1)).squeeze(0)
-            tmp_loss = F.binary_cross_entropy(torch.sigmoid(output), ans)
-            type_loss.append(tmp_loss)
-            x, y = output.tolist()
-            if x>y:
-                extract.append((i, x_h[i].unsqueeze(0)))
-            else:
-                generate.append((i, x_h_q[i].unsqueeze(0)))
+        # for i, (v1, v2, t) in enumerate(zip(x_h, x_h_q, answer_types)):
+        #     if t == 'extractive':
+        #         ans = torch.tensor([1, 0]).float().cuda()
+        #     else:
+        #         ans = torch.tensor([0, 1]).float().cuda()
+        #
+        #     o1 = F.avg_pool1d(v1.unsqueeze(0), kernel_size=self.hidden_size * 2).squeeze(2)
+        #     o2 = F.avg_pool1d(v2.unsqueeze(0), kernel_size=self.hidden_size * 2).squeeze(2)
+        #     output = self.type_out(torch.cat((o1, o2), 1)).squeeze(0)
+        #     tmp_loss = F.binary_cross_entropy(torch.sigmoid(output), ans)
+        #     type_loss.append(tmp_loss)
+        #     x, y = output.tolist()
+        #     if x>y:
+        #         extract.append((i, x_h[i].unsqueeze(0)))
+        #     else:
+        #         generate.append((i, x_h_q[i].unsqueeze(0)))
         for i in range(self.batch_size):
             extract.append((i, x_final[i].unsqueeze(0)))
 

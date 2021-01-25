@@ -78,10 +78,12 @@ class ConvQA_CN_NetTrainer(BaseTrainer):
             dev_data = json.load(f)
 
         best_f1_score = 0
+
         num_epochs = self.opt['EPOCH']
         self.scheduler = CyclicLRWithRestarts(self.optimizer, batch_size, num_epochs, restart_period=5, t_mult=1.2,
                                          policy="cosine")
         for epoch in range(self.epoch_start, num_epochs):
+            ### best_f1_score记录每个epoch里的最优值
             self.log('\n########Epoch {}########\n'.format(epoch))
             # self.network.train()
             start_time = datetime.now()
@@ -90,6 +92,7 @@ class ConvQA_CN_NetTrainer(BaseTrainer):
             self.scheduler.step()
             ### step = 2700
             for i, batch in enumerate(train_batches):
+
                 ''' 先判断是否进入测试阶段
                 三个条件：
                     1.正常训练即将结束

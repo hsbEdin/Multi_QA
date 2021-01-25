@@ -250,8 +250,8 @@ class BatchGen:
                 if qa_len==1:
                     continue
 
-                if datum['qas'][i]['answer_type'] != 'extractive':
-                    continue
+                # if datum['qas'][i]['answer_type'] != 'extractive':
+                #     continue
                 if self.opt['dataset'] == 'quac':
                     if datum['qas'][i]['turn_id'][-3:-1]=="q#":
                         turn_id = int(datum['qas'][i]['turn_id'][-1]) + 1
@@ -512,7 +512,7 @@ class BatchGen:
                         qa_pair += ' '
                         qa_pair += query_token + ' ' + answer_token
                     qa_pair = qa_pair[1:]
-                    # 将历史信息拼成了一句话 qaqaqa
+                    # 将历史信息拼成了一句话 qaqaqa 可以加个分隔符号
                     qa_max_len = (self.ques_max_len + self.ans_max_len + 1) * max_his_turns + max_his_turns - 1
                     # his, his_bert_mask = tensorFromSentence(self.lang, qa_pair, qa_max_len)
 
