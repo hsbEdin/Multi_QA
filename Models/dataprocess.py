@@ -6,7 +6,7 @@ import unicodedata
 import string
 import re
 import random
-
+import pdb
 SOS_token = 0
 EOS_token = 1
 
@@ -52,9 +52,10 @@ def readLangs(train_data, dev_data):
     print("Reading {} data for seq2seq model...".format(dev_data))
 
     # Read the file and split into lines
-
-    train_path = 'data/coqa-' + train_data +'-v1.0.json'
-    dev_path = 'data/coqa-' + dev_data +'-v1.0.json'
+    # train_path = 'data/quac_original/' + train_data +'_v0.2.json'
+    # dev_path = 'data/quac_original/' + 'val' +'_v0.2.json'
+    train_path = 'data/quac_original/train_small.json'
+    dev_path = 'data/quac_original/val_small.json'
 
     with open(train_path, 'r') as f1:
         train_dataset = json.load(f1)
@@ -93,21 +94,21 @@ def readLangs(train_data, dev_data):
     #         train_text += " " + A
     for dataset in [train_dataset['data'], dev_dataset['data']]:
         for i, data in enumerate(dataset):
-            story = data['story']
+            feature = data['paragraphs'][0]
+            story = feature['context']
             story = normalizeString(story)# 处理文本，取出标点等
             train_text += " " + story
             dev_text += " " + story
-            ques = data['questions']
-            for q in ques:
-                Q = normalizeString(q["input_text"])
+            qas = feature['qas']
+            for qa in qas:
+                ques = qa['question']
+                ans = qa['answers'][0]['text']
+                Q = normalizeString(ques)
                 train_text += " " + Q
                 dev_text += " " + Q
-            ans = data['answers']
-            for a in ans:
-                A = normalizeString(a["input_text"])
+                A = normalizeString(ans)
                 dev_text += " " + A
                 train_text += " " + A
-
 
     train_lang = Lang(train_data)
     train_lang.addSentence((train_text))
@@ -139,7 +140,6 @@ def filterPairs(pairs):
 def prepareData(train, dev):
     train_lang, dev_lang = readLangs(train, dev)
     print("Counted words:")
-    print(train_lang.name, train_lang.n_words)
     print(dev_lang.name, dev_lang.n_words)
     return train_lang, dev_lang
 

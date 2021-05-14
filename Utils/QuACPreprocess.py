@@ -20,7 +20,7 @@ import os
 
 class QuACPreprocess():
     def __init__(self, opt):
-        print('CoQA Preprocessing')
+        print('QuAC Preprocessing')
         self.opt = opt
         self.spacyDir = opt['FEATURE_FOLDER']
         self.train_file = os.path.join(opt['datadir'], opt['Quac_TRAIN_FILE'])
@@ -41,7 +41,7 @@ class QuACPreprocess():
             return
 
         print('Previously result not found, creating preprocessed files now...')
-        self.glove_vocab = load_glove_vocab(self.glove_file, self.glove_dim, to_lower=False)
+        # self.glove_vocab = load_glove_vocab(self.glove_file, self.glove_dim, to_lower=False)
         if not os.path.isdir(self.spacyDir):
             os.makedirs(self.spacyDir)
             print('Directory created: ' + self.spacyDir)
@@ -61,9 +61,10 @@ class QuACPreprocess():
             dataset = json.load(f)
 
         print('Processing json...')
-
+        count = 0
         data = []
         tot = len(dataset['data'])
+        type1 = type2 = 0
         for data_idx in tqdm(range(tot)):
             datum = dataset['data'][data_idx]['paragraphs'][0]
             context_str = datum['context']
@@ -82,7 +83,7 @@ class QuACPreprocess():
             for i in range(len(datum['qas'])):
                 question, answer = datum['qas'][i]['question'], datum['qas'][i]['answers'][0]['text']
                 # assert question['turn_id'] == answer['turn_id']
-
+                count += 1
                 idx = datum['qas'][i]['id']
                 _qas = {'turn_id': idx,
                         'question': question,
@@ -92,10 +93,20 @@ class QuACPreprocess():
 
                 _qas['annotated_answer'] = self.process(nlp(pre_proc(answer)))
                 _qas['raw_answer'] = answer
-                _qas['span_text'] = answer
                 _qas['answer_type'] = "extractive"
                 _qas['answer_span_start'] = datum['qas'][i]['answers'][0]['answer_start']
                 _qas['answer_span_end'] = _qas['answer_span_start'] + len(answer) + 1
+                _qas['followup'] = datum['qas'][i]['followup']
+                _qas['yesno'] = datum['qas'][i]['yesno']
+                
+                tmp = _qas['raw_answer']
+                tmp = self.removePunctuation(tmp)
+                if _qas['raw_answer'] in context_str or tmp.lower() in ["yes", "no", "unknown"]:
+                    type1 += 1
+                    _qas['answer_type'] = "extractive"
+                else:
+                    type2 += 1
+                    _qas['answer_type'] = "generative"
 
                 start = _qas['answer_span_start']  # rational 范围
                 end = _qas['answer_span_end']
@@ -125,29 +136,29 @@ class QuACPreprocess():
             contexts = [_datum['annotated_context']['word'] for _datum in data]
             qas = [qa['annotated_question']['word'] + qa['annotated_answer']['word'] for qa in _datum['qas'] for _datum
                    in data]
-            self.train_vocab = self.build_vocab(contexts, qas)
+            # self.train_vocab = self.build_vocab(contexts, qas)
 
-        print('Getting word ids...')
-        w2id = {w: i for i, w in enumerate(self.train_vocab)}
-        for _datum in data:
-            _datum['annotated_context']['wordid'] = token2id_sent(_datum['annotated_context']['word'], w2id, unk_id=1,
-                                                                  to_lower=False)
-            # new modify, get wordid
-            for qa in _datum['qas']:
-                qa['annotated_question']['wordid'] = token2id_sent(qa['annotated_question']['word'], w2id, unk_id=1,
-                                                                   to_lower=False)
-                qa['annotated_answer']['wordid'] = token2id_sent(qa['annotated_answer']['word'], w2id, unk_id=1,
-                                                                 to_lower=False)
+        # print('Getting word ids...')
+        # w2id = {w: i for i, w in enumerate(self.train_vocab)}
+        # for _datum in data:
+        #     _datum['annotated_context']['wordid'] = token2id_sent(_datum['annotated_context']['word'], w2id, unk_id=1,
+        #                                                           to_lower=False)
+        #     # new modify, get wordid
+        #     for qa in _datum['qas']:
+        #         qa['annotated_question']['wordid'] = token2id_sent(qa['annotated_question']['word'], w2id, unk_id=1,
+        #                                                            to_lower=False)
+        #         qa['annotated_answer']['wordid'] = token2id_sent(qa['annotated_answer']['word'], w2id, unk_id=1,
+        #                                                          to_lower=False)
 
-        if dataset_label == 'train':
-            # get the condensed dictionary embedding
-            print('Getting embedding matrix for ' + dataset_label)
-            embedding = build_embedding(self.glove_file, self.train_vocab, self.glove_dim)
-            meta = {'vocab': self.train_vocab, 'embedding': embedding.tolist()}
-            meta_file_name = os.path.join(self.spacyDir, dataset_label + '_meta.msgpack')
-            print('Saving meta information to', meta_file_name)
-            with open(meta_file_name, 'wb') as f:
-                msgpack.dump(meta, f, encoding='utf8')
+        # if dataset_label == 'train':
+        #     # get the condensed dictionary embedding
+        #     print('Getting embedding matrix for ' + dataset_label)
+        #     embedding = build_embedding(self.glove_file, self.train_vocab, self.glove_dim)
+        #     meta = {'vocab': self.train_vocab, 'embedding': embedding.tolist()}
+        #     meta_file_name = os.path.join(self.spacyDir, dataset_label + '_meta.msgpack')
+        #     print('Saving meta information to', meta_file_name)
+        #     with open(meta_file_name, 'wb') as f:
+        #         msgpack.dump(meta, f, encoding='utf8')
 
         dataset['data'] = data
 
@@ -156,7 +167,9 @@ class QuACPreprocess():
 
         with open(output_file_name, 'w') as output_file:
             json.dump(dataset, output_file, sort_keys=True, indent=4)
-
+        print("The amount of extractive qa is: ", type1)
+        print("The amount of generative qa is: ", type2)
+        print("The amount of qas is: ", count)
     '''
      Return train_vocab embedding
     '''
@@ -325,3 +338,8 @@ class QuACPreprocess():
             if (end_index < 0) and (end <= offset[1]):
                 end_index = i
         return (start_index, end_index)
+
+    def removePunctuation(self, text):
+        punctuation = '!,;:?"\'、，；'
+        text = re.sub(r'[{}]+'.format(punctuation), ' ', text)
+        return text.strip()

@@ -103,7 +103,10 @@ class CoQAPreprocess():
                 _qas['annotated_answer'] = self.process(nlp(pre_proc(answer['input_text'])))
                 _qas['raw_answer'] = answer['input_text']
                 _qas['span_text'] = answer['span_text']
-                if _qas['raw_answer'] in context_str:
+
+                tmp = _qas['raw_answer']
+                tmp = self.removePunctuation(tmp)
+                if _qas['raw_answer'] in context_str or tmp.lower() in ["yes", "no", "unknown"]:
                     type1 += 1
                     _qas['answer_type'] = "extractive"
                 else:
@@ -175,7 +178,8 @@ class CoQAPreprocess():
             meta_file_name = os.path.join(self.spacyDir, dataset_label + '_meta.msgpack')
             print('Saving meta information to', meta_file_name)
             with open(meta_file_name, 'wb') as f:
-                msgpack.dump(meta, f, encoding='utf8')
+                # msgpack.dump(meta, f, encoding='utf8')
+                msgpack.dump(meta, f)
 
         dataset['data'] = data
 
@@ -352,3 +356,8 @@ class CoQAPreprocess():
             if (end_index < 0) and (end <= offset[1]):
                 end_index = i
         return (start_index, end_index)
+
+    def removePunctuation(self, text):
+        punctuation = '!,;:?"\'、，；'
+        text = re.sub(r'[{}]+'.format(punctuation), ' ', text)
+        return text.strip()
