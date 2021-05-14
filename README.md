@@ -1,11 +1,7 @@
 # Multi Conversational Question Answering Model
 
-This is a multi conversational question answering model based on the History Attention for Conversational Question Answering model.
-We only train the loss of start-end prediction, instead of using multi learning loss.
-
-
-POSHAE:
-https://github.com/prdwb/attentive_history_selection
+This is a multi conversational question answering. 
+We integrate the historical turn information into the vector, and get the extracted and generated answers by discrimination.
 
 ```
 
